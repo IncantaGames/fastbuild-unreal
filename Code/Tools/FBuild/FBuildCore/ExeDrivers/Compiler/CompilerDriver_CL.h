@@ -1,4 +1,4 @@
-// CompilerDriver_CL.h 
+// CompilerDriver_CL.h
 //------------------------------------------------------------------------------
 #pragma once
 
@@ -14,7 +14,7 @@
 class CompilerDriver_CL : public CompilerDriverBase
 {
 public:
-    explicit CompilerDriver_CL( bool isClangCL );
+    explicit CompilerDriver_CL( bool isClangCL, bool isUnrealEngine );
     virtual ~CompilerDriver_CL() override;
 
 protected:
@@ -58,6 +58,7 @@ protected:
                                  bool allowStartsWith = false );
 
     bool m_IsClangCL = false; // Using clang in CL compatibility mode?
+    bool m_IsUnrealEngine = false;
 };
 
 //------------------------------------------------------------------------------

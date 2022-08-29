@@ -19,7 +19,7 @@
 class CompilerDriver_GCCClang : public CompilerDriverBase
 {
 public:
-    explicit CompilerDriver_GCCClang( bool isClang );
+    explicit CompilerDriver_GCCClang( bool isClang, bool isUnrealEngine );
     virtual ~CompilerDriver_GCCClang() override;
 
     virtual bool ProcessArg_PreprocessorOnly( const AString & token,
@@ -55,6 +55,7 @@ protected:
                                       size_t & index ) const;
 
     bool m_IsClang = false;
+    bool m_IsUnrealEngine = false;
 };
 
 //------------------------------------------------------------------------------

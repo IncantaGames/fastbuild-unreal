@@ -14,8 +14,9 @@
 
 // CONSTRUCTOR
 //------------------------------------------------------------------------------
-CompilerDriver_GCCClang::CompilerDriver_GCCClang( bool isClang )
+CompilerDriver_GCCClang::CompilerDriver_GCCClang( bool isClang, bool isUnrealEngine )
     : m_IsClang( isClang )
+    , m_IsUnrealEngine(isUnrealEngine)
 {
 }
 
@@ -81,6 +82,19 @@ CompilerDriver_GCCClang::~CompilerDriver_GCCClang() = default;
         if ( StripTokenWithArg( "-I", token, index ) )
         {
             return true;
+        }
+
+        if ( m_IsUnrealEngine )
+        {
+            // Remove dependency file generation so it's only performed on local system
+            if ( StripToken( "-MD", token ) )
+            {
+                return true;
+            }
+            if ( StripTokenWithArg( "-MF", token, index ) )
+            {
+                return true;
+            }
         }
     }
 

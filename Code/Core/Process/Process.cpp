@@ -33,6 +33,7 @@
     #include <string.h>
     #include <sys/wait.h>
     #include <unistd.h>
+    #include <wordexp.h>
 #endif
 
 // Static Data
@@ -310,21 +311,30 @@ bool Process::Spawn( const char * executable,
         if ( args )
         {
             // Tokenize
-            AStackString<> argCopy( args );
-            argCopy.Tokenize( splitArgs );
+            wordexp_t expResult;
+            memset(&expResult, 0, sizeof(wordexp_t));
+
+            int wordRes = wordexp( args, &expResult, 0 );
+            if (wordRes != 0)
+                return false;
 
             // Build Vector
-            for ( AString & arg : splitArgs )
+            char** words = expResult.we_wordv;
+            unsigned int wordCount = expResult.we_wordc;
+
+            // Set capacity here to avoid reallocation while appending
+            splitArgs.SetCapacity(wordCount);
+            argVector.SetCapacity(wordCount + 1); // + 1 for the nullptr terminator
+
+            for ( unsigned int wordIndex = 0; wordIndex < wordCount; ++wordIndex )
             {
-                if ( arg.BeginsWith( '"' ) && arg.EndsWith( '"' ) )
-                {
-                    // strip quotes
-                    arg.SetLength( arg.GetLength() - 1 ); // trim end quote
-                    argVector.Append( arg.Get() + 1 ); // skip start quote
-                    continue;
-                }
-                argVector.Append( arg.Get() ); // leave arg as-is
+                // Make a copy of the string and stick it in splitArgs, as the strings allocated
+                // by wordexp will be freed when we leave this scope.
+                splitArgs.Append( AString( words[wordIndex] ) );
+                argVector.Append( splitArgs.Top().Get() );
             }
+
+            wordfree( &expResult );
         }
         argVector.Append( nullptr ); // argv must have be nullptr terminated
 
@@ -698,7 +708,7 @@ bool Process::ReadAllData( AString & outMem,
         {
             ASSERT( false ); // error!
         }
-        
+
         // Update length
         buffer.SetLength( sizeSoFar + bytesReadNow );
     }
@@ -745,7 +755,7 @@ bool Process::ReadAllData( AString & outMem,
             ASSERT( false ); // error!
             result = 0; // no bytes read
         }
-        
+
         // Update length
         buffer.SetLength( buffer.GetLength() + (uint32_t)result );
     }

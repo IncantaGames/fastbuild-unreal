@@ -236,7 +236,7 @@ ObjectNode::~ObjectNode()
     const bool useCache = ShouldUseCache();
     const bool useDist = m_CompilerFlags.IsDistributable() && m_AllowDistribution && FBuild::Get().GetOptions().m_AllowDistributed;
     const bool useSimpleDist = GetCompiler()->SimpleDistributionMode();
-    bool usePreProcessor = !useSimpleDist && ( useCache || useDist || IsGCC() || IsSNC() || IsClang() || IsClangCl() || IsCodeWarriorWii() || IsGreenHillsWiiU() || IsVBCC() || IsOrbisWavePSSLC() );
+    bool usePreProcessor = !useSimpleDist && ( useCache || useDist || IsGCC() || IsSNC() || ((IsClang() || IsClangCl()) && useDist) || IsCodeWarriorWii() || IsGreenHillsWiiU() || IsVBCC() || IsOrbisWavePSSLC() );
     if ( GetDedicatedPreprocessor() )
     {
         usePreProcessor = true;
@@ -543,10 +543,12 @@ Node::BuildResult ObjectNode::DoBuildWithPreProcessor2( Job * job, bool useDeopt
     bool usePreProcessedOutput = true;
     if ( job->IsLocal() )
     {
-        if ( IsClang() ||
-             IsClangCl() ||
-             IsGCC() ||
-             IsSNC() )
+        if ( IsClang() || IsClangCL() )
+        {
+            usePreProcessedOutput = false;
+        }
+
+        if ( IsGCC() || IsSNC() )
         {
             // Using the PCH with Clang/SNC/GCC doesn't prevent storing to the cache
             // so we can use the PCH accelerated compilation
@@ -1374,7 +1376,7 @@ bool ObjectNode::RetrieveFromCache( Job * job )
         {
             pchKey = xxHash::Calc64( cacheData, cacheDataSize );
         }
-        
+
         const uint32_t startDecompress = uint32_t( t.GetElapsedMS() );
 
         MultiBuffer buffer( cacheData, cacheDataSize );
@@ -1756,6 +1758,46 @@ bool ObjectNode::BuildArgs( const Job * job, Args & fullArgs, Pass pass, bool us
         if ( driver->ProcessArg_BuildTimeSubstitution( token, i, fullArgs ) )
         {
             continue;
+        }
+
+        // Handle Unreal Engine specific changes
+        {
+            // %5 -> FirstExtraFile
+            {
+                const char * const found = token.Find( "%5" );
+                if ( found )
+                {
+                    AStackString<> extraFile;
+                    if ( job->IsLocal() == false )
+                    {
+                        job->GetToolManifest()->GetRemoteFilePath( 1, extraFile );
+                    }
+
+                    fullArgs += AStackString<>( token.Get(), found );
+                    fullArgs += job->IsLocal() ? GetCompiler()->GetExtraFile( 0 ) : extraFile;
+                    fullArgs += AStackString<>( found + 2, token.GetEnd() );
+                    fullArgs.AddDelimiter();
+                    continue;
+                }
+            }
+
+            // %CLFilterDependenciesOutput -> file name Unreal Engine's cl-filter -dependencies param
+            // MSVC's /showIncludes option doesn't output anything when compiling a preprocessed file,
+            // so in that case we change the file name so that it doesn't override the file generated
+            // during preprocessing pass.
+            const char * const found = token.Find( "%CLFilterDependenciesOutput" );
+            if ( found )
+            {
+                AString nameWithoutExtension( m_Name );
+                PathUtils::StripFileExtension( nameWithoutExtension );
+
+                fullArgs += AStackString<>( token.Get(), found );
+                fullArgs += nameWithoutExtension;
+                fullArgs += pass == PASS_COMPILE_PREPROCESSED ? ".empty" : ".txt";
+                fullArgs += AStackString<>( found + 27, token.GetEnd() );
+                fullArgs.AddDelimiter();
+                    continue;
+            }
         }
 
         // untouched token
@@ -2289,13 +2331,13 @@ bool ObjectNode::CompileHelper::SpawnCompiler( Job * job,
             {
                 Thread::Sleep( 1 );
             }
-            
+
             // Add fake failure
             ASSERT( m_Result == 0 ); // Should not have real failures if we're faking them
             m_Result = 1;
             job->Error( "Injecting system failure (sFakeSystemFailure)\n" );
             job->OnSystemError();
-            
+
             // Clear failure state
             sFakeSystemFailureState.Store( DISABLED );
         }
@@ -2502,7 +2544,7 @@ bool ObjectNode::CompileHelper::SpawnCompiler( Job * job,
         }
     }
 
-    #if !defined( __WINDOWS__) 
+    #if !defined( __WINDOWS__)
         (void)stdOut; // No checks use stdOut outside of Windows right now
     #endif
 }
@@ -2782,8 +2824,8 @@ void ObjectNode::CreateDriver( ObjectNode::CompilerFlags flags,
                                const AString & remoteSourceRoot,
                                UniquePtr<CompilerDriverBase, DeleteDeletor> & outDriver ) const
 {
-    if      ( flags.IsMSVC() || flags.IsClangCl() ) { outDriver = FNEW( CompilerDriver_CL( flags.IsClangCl() ) ); }
-    else if ( flags.IsClang() || flags.IsGCC() )    { outDriver = FNEW( CompilerDriver_GCCClang( flags.IsClang() ) ); }
+    if      ( flags.IsMSVC() || flags.IsClangCl() ) { outDriver = FNEW( CompilerDriver_CL( flags.IsClangCl(), flag.IsUnrealEngine() ) ); }
+    else if ( flags.IsClang() || flags.IsGCC() )    { outDriver = FNEW( CompilerDriver_GCCClang( flags.IsClang(), flag.IsUnrealEngine() ) ); }
     else if ( flags.IsVBCC() )                      { outDriver = FNEW( CompilerDriver_VBCC() ); }
     else if ( flags.IsQtRCC() )                     { outDriver = FNEW( CompilerDriver_QtRCC() ); }
     else if ( flags.IsOrbisWavePSSLC() )            { outDriver = FNEW( CompilerDriver_OrbisWavePSSLC() ); }

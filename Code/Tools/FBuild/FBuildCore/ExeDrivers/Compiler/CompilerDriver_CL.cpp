@@ -16,8 +16,9 @@
 
 // CONSTRUCTOR
 //------------------------------------------------------------------------------
-CompilerDriver_CL::CompilerDriver_CL( bool isClangCL )
+CompilerDriver_CL::CompilerDriver_CL( bool isClangCL, bool isUnrealEngine )
     : m_IsClangCL( isClangCL )
+    , m_IsUnrealEngine( isUnrealEngine )
 {}
 
 // DESTRUCTOR
@@ -149,7 +150,7 @@ CompilerDriver_CL::~CompilerDriver_CL() = default;
     {
         return true;
     }
-    
+
     return false;
 }
 
