@@ -12,7 +12,7 @@ Compiler( 'Compiler-Clang8' )
     // Allow tests to activate some experimental behavior
     #if ENABLE_RELATIVE_PATHS
         .UseRelativePaths_Experimental = true
-    #endif    
+    #endif
     #if ENABLE_SOURCE_MAPPING
         .SourceMapping_Experimental = '/fastbuild-test-mapping'
     #endif
@@ -58,7 +58,7 @@ Compiler( 'Compiler-Clang8' )
 
     // Linker
     .Linker                         = '$Clang8_BasePath$/clang++'
-    .LinkerOptions                  = '"%1" -o "%2" -g'
+    .LinkerOptions                  = '"%1" -framework Cocoa -o "%2" -g'
                                     + ' -mmacosx-version-min=10.7'
                                     + ' -stdlib=libc++'
 
